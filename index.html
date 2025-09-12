@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nihongo Number Master</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e0f2fe; /* Light blue background */
+        }
+        .japanese-font {
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+        .feedback {
+            transition: opacity 0.3s ease-in-out;
+        }
+        /* Menyembunyikan panah atas/bawah pada input angka */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+    <div class="w-full max-w-md mx-auto p-4">
+        <header class="text-center mb-6 sm:mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-slate-800">Nihongo Number Master</h1>
+            <p class="text-slate-600 mt-2 japanese-font text-base sm:text-lg">日本の数字の知識を試してみよう！</p>
+        </header>
+
+        <main class="bg-white p-5 sm:p-8 rounded-2xl shadow-xl">
+            <!-- Tombol Ganti Mode -->
+            <div class="flex border border-gray-200 rounded-lg p-1 mb-6">
+                <button id="modeNumToHira" class="w-1/2 p-2 rounded-md text-sm sm:text-base font-semibold transition-colors">Angka → Hiragana</button>
+                <button id="modeHiraToNum" class="w-1/2 p-2 rounded-md text-sm sm:text-base font-semibold transition-colors">Hiragana → Angka</button>
+            </div>
+
+            <!-- Pilihan Level Angka -->
+            <div class="mb-6">
+                <label for="difficulty" class="block text-sm font-medium text-gray-700 mb-2">Pilih Level Angka:</label>
+                <select id="difficultySelector" name="difficulty" class="w-full p-3 border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50 text-base">
+                    <option value="100">Dasar (1 - 100)</option>
+                    <option value="1000">Ratusan (1 - 1.000)</option>
+                    <option value="10000">Ribuan (1 - 10.000)</option>
+                    <option value="100000">Puluhan Ribu (1 - 100.000)</option>
+                    <option value="1000000" selected>Jutaan (1 - 1.000.000)</option>
+                </select>
+            </div>
+
+            <!-- Area Kuis -->
+            <div>
+                <!-- Display Soal -->
+                <div id="questionDisplay" class="bg-gray-100 w-full min-h-[6rem] p-4 flex items-center justify-center rounded-lg mb-4">
+                    <p id="questionText" class="text-3xl sm:text-4xl font-bold text-slate-800 tracking-wider text-center break-words leading-tight"></p>
+                </div>
+
+                <!-- Input Jawaban -->
+                <div id="answerSection">
+                    <input type="text" id="answerInput" placeholder="Ketik jawaban Anda..." class="w-full p-4 border-2 border-gray-200 rounded-lg text-center text-base sm:text-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                </div>
+               
+                <!-- Feedback -->
+                <div id="feedback" class="feedback h-6 mt-4 text-center font-semibold text-base sm:text-lg opacity-0"></div>
+
+                <!-- Tombol Aksi -->
+                <div class="flex items-center gap-3 mt-4">
+                    <button id="checkButton" class="w-full bg-blue-500 text-white p-4 rounded-lg font-bold text-base sm:text-lg hover:bg-blue-600 active:bg-blue-700 transition-transform transform active:scale-95">
+                        Cek Jawaban
+                    </button>
+                    <button id="reloadButton" class="flex-shrink-0 bg-gray-200 text-gray-700 p-4 rounded-lg hover:bg-gray-300 active:bg-gray-400 transition-colors" title="Soal Baru">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-refresh-cw"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Referensi Elemen DOM
+    const modeNumToHiraBtn = document.getElementById('modeNumToHira');
+    const modeHiraToNumBtn = document.getElementById('modeHiraToNum');
+    const difficultySelector = document.getElementById('difficultySelector');
+    const questionText = document.getElementById('questionText');
+    const answerInput = document.getElementById('answerInput');
+    const checkButton = document.getElementById('checkButton');
+    const reloadButton = document.getElementById('reloadButton');
+    const feedback = document.getElementById('feedback');
+    
+    // State Aplikasi
+    let currentMode = 'numToHira';
+    let questions = {
+        numToHira: { number: 0, hiragana: '' },
+        hiraToNum: { number: 0, hiragana: '' }
+    };
+    let correctAnswer = '';
+    let wrongAttempts = 0;
+
+    function numberToHiragana(num) {
+        if (num === 0) return 'ゼロ';
+        const ones = ['', 'いち', 'に', 'さん', 'よん', 'ご', 'ろく', 'なな', 'はち', 'きゅう'];
+        const tens = ['', 'じゅう', 'にじゅう', 'さんじゅう', 'よんじゅう', 'ごじゅう', 'ろくじゅう', 'ななじゅう', 'はちじゅう', 'きゅうじゅう'];
+        let result = '';
+        if (num >= 1000000) {
+            const millions = Math.floor(num / 1000000);
+            result += (millions === 1 ? '' : numberToHiragana(millions)) + 'ひゃくまん';
+            num %= 1000000;
+        }
+        if (num >= 10000) {
+            const tenThousands = Math.floor(num / 10000);
+            result += (tenThousands === 1 ? 'いち' : numberToHiragana(tenThousands)) + 'まん';
+            num %= 10000;
+        }
+        if (num >= 1000) {
+            const thousands = Math.floor(num / 1000);
+            if (thousands === 1) result += 'せん';
+            else if (thousands === 3) result += 'さんぜん';
+            else if (thousands === 8) result += 'はっせん';
+            else result += ones[thousands] + 'せん';
+            num %= 1000;
+        }
+        if (num >= 100) {
+            const hundreds = Math.floor(num / 100);
+            if (hundreds === 1) result += 'ひゃく';
+            else if (hundreds === 3) result += 'さんびゃく';
+            else if (hundreds === 6) result += 'ろっぴゃく';
+            else if (hundreds === 8) result += 'はっぴゃく';
+            else result += ones[hundreds] + 'ひゃく';
+            num %= 100;
+        }
+        if (num >= 10) {
+            result += tens[Math.floor(num / 10)];
+            num %= 10;
+        }
+        if (num > 0) {
+            result += ones[num];
+        }
+        return result;
+    }
+
+    function saveState() {
+        const state = {
+            currentMode: currentMode,
+            questions: questions,
+            difficulty: difficultySelector.value
+        };
+        localStorage.setItem('nihongoMasterState', JSON.stringify(state));
+    }
+
+    function loadState() {
+        const savedState = localStorage.getItem('nihongoMasterState');
+        if (savedState) {
+            const state = JSON.parse(savedState);
+            if (state.currentMode && state.questions && state.difficulty) {
+                currentMode = state.currentMode;
+                questions = state.questions;
+                difficultySelector.value = state.difficulty;
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    function updateQuestionDisplay() {
+        const questionData = questions[currentMode];
+        if (!questionData || questionData.number === 0) {
+             generateQuestionForCurrentMode();
+             return;
+        }
+        if (currentMode === 'numToHira') {
+            questionText.textContent = questionData.number.toLocaleString('en-US');
+            questionText.classList.remove('japanese-font');
+            correctAnswer = questionData.hiragana;
+        } else {
+            questionText.textContent = questionData.hiragana;
+            questionText.classList.add('japanese-font');
+            correctAnswer = questionData.number.toString();
+        }
+        wrongAttempts = 0;
+        answerInput.disabled = false;
+        checkButton.disabled = false;
+    }
+
+    function generateQuestionForCurrentMode() {
+        answerInput.value = '';
+        hideFeedback();
+        
+        const maxNumber = parseInt(difficultySelector.value);
+        const newNumber = Math.floor(Math.random() * maxNumber) + 1;
+        
+        questions[currentMode].number = newNumber;
+        questions[currentMode].hiragana = numberToHiragana(newNumber);
+        
+        updateQuestionDisplay();
+        saveState();
+    }
+    
+    function switchMode(newMode) {
+        currentMode = newMode;
+        answerInput.value = ''; 
+        hideFeedback();
+
+        if (newMode === 'numToHira') {
+            modeNumToHiraBtn.classList.add('bg-blue-500', 'text-white');
+            modeNumToHiraBtn.classList.remove('bg-gray-100', 'text-gray-700');
+            modeHiraToNumBtn.classList.remove('bg-blue-500', 'text-white');
+            modeHiraToNumBtn.classList.add('bg-gray-100', 'text-gray-700');
+            
+            answerInput.type = 'text';
+            answerInput.placeholder = 'Ketik jawaban Hiragana...';
+        } else {
+            modeHiraToNumBtn.classList.add('bg-blue-500', 'text-white');
+            modeHiraToNumBtn.classList.remove('bg-gray-100', 'text-gray-700');
+            modeNumToHiraBtn.classList.remove('bg-blue-500', 'text-white');
+            modeNumToHiraBtn.classList.add('bg-gray-100', 'text-gray-700');
+
+            answerInput.type = 'number';
+            answerInput.placeholder = 'Masukkan angka...';
+        }
+        updateQuestionDisplay();
+        saveState();
+    }
+    
+    function showFeedback(message, isCorrect) {
+        feedback.textContent = message;
+        feedback.style.color = isCorrect ? '#16a34a' : '#dc2626';
+        feedback.classList.remove('opacity-0');
+    }
+    
+    function hideFeedback() {
+        feedback.classList.add('opacity-0');
+    }
+
+    function checkAnswer() {
+        const userAnswer = answerInput.value.trim().toLowerCase();
+        
+        if (!userAnswer) return;
+
+        if (userAnswer === correctAnswer) {
+            showFeedback('Benar! Bagus sekali!', true);
+            answerInput.disabled = true;
+            checkButton.disabled = true;
+            setTimeout(generateQuestionForCurrentMode, 1500);
+        } else {
+            wrongAttempts++;
+            if (wrongAttempts >= 2) {
+                showFeedback(`Jawaban benar: ${correctAnswer}`, false);
+                answerInput.disabled = true;
+                checkButton.disabled = true;
+                setTimeout(generateQuestionForCurrentMode, 3000);
+            } else {
+                showFeedback('Salah, coba lagi!', false);
+                answerInput.focus();
+            }
+        }
+    }
+
+    function initializeBothQuestions() {
+        const maxNumber = parseInt(difficultySelector.value);
+        let num1 = Math.floor(Math.random() * maxNumber) + 1;
+        questions.numToHira = { number: num1, hiragana: numberToHiragana(num1) };
+
+        let num2;
+        do {
+            num2 = Math.floor(Math.random() * maxNumber) + 1;
+        } while (num1 === num2);
+        questions.hiraToNum = { number: num2, hiragana: numberToHiragana(num2) };
+        saveState();
+    }
+
+    // Event Listeners
+    modeNumToHiraBtn.addEventListener('click', () => switchMode('numToHira'));
+    modeHiraToNumBtn.addEventListener('click', () => switchMode('hiraToNum'));
+    
+    difficultySelector.addEventListener('change', () => {
+        initializeBothQuestions();
+        updateQuestionDisplay();
+    });
+
+    reloadButton.addEventListener('click', generateQuestionForCurrentMode);
+    checkButton.addEventListener('click', checkAnswer);
+    answerInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            checkAnswer();
+        }
+    });
+
+    // Inisialisasi Aplikasi
+    if (!loadState()) {
+        initializeBothQuestions();
+    }
+    switchMode(currentMode); 
+});
+</script>
+</body>
+</html>
+
