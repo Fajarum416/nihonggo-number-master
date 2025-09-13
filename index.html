@@ -38,8 +38,8 @@
         <main class="bg-white p-5 sm:p-8 rounded-2xl shadow-xl">
             <!-- Tombol Ganti Mode -->
             <div class="flex border border-gray-200 rounded-lg p-1 mb-6">
-                <button id="modeNumToHira" class="w-1/2 p-2 rounded-md text-sm sm:text-base font-semibold transition-colors">Angka → Hiragana</button>
-                <button id="modeHiraToNum" class="w-1/2 p-2 rounded-md text-sm sm:text-base font-semibold transition-colors">Hiragana → Angka</button>
+                <button id="modeNumToHira" class="w-1/2 py-2 px-1 sm:px-2 rounded-md text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap">Angka → Hiragana</button>
+                <button id="modeHiraToNum" class="w-1/2 py-2 px-1 sm:px-2 rounded-md text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap">Hiragana → Angka</button>
             </div>
 
             <!-- Pilihan Level Angka -->
@@ -50,7 +50,8 @@
                     <option value="1000">Ratusan (1 - 1.000)</option>
                     <option value="10000">Ribuan (1 - 10.000)</option>
                     <option value="100000">Puluhan Ribu (1 - 100.000)</option>
-                    <option value="1000000" selected>Jutaan (1 - 1.000.000)</option>
+                    <option value="1000000">Jutaan (1 - 1.000.000)</option>
+                    <option value="10000000" selected>Puluhan Juta (1 - 10.000.000)</option>
                 </select>
             </div>
 
@@ -67,15 +68,15 @@
                 </div>
                
                 <!-- Feedback -->
-                <div id="feedback" class="feedback h-6 mt-4 text-center font-semibold text-base sm:text-lg opacity-0"></div>
+                <div id="feedback" class="feedback h-6 mt-4 text-center font-semibold text-sm sm:text-base opacity-0"></div>
 
                 <!-- Tombol Aksi -->
                 <div class="flex items-center gap-3 mt-4">
-                    <button id="checkButton" class="w-full bg-blue-500 text-white p-4 rounded-lg font-bold text-base sm:text-lg hover:bg-blue-600 active:bg-blue-700 transition-transform transform active:scale-95">
+                    <button id="checkButton" class="w-full bg-blue-500 text-white p-3 sm:p-4 rounded-lg font-bold text-base sm:text-lg hover:bg-blue-600 active:bg-blue-700 transition-transform transform active:scale-95">
                         Cek Jawaban
                     </button>
-                    <button id="reloadButton" class="flex-shrink-0 bg-gray-200 text-gray-700 p-4 rounded-lg hover:bg-gray-300 active:bg-gray-400 transition-colors" title="Soal Baru">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-refresh-cw"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                    <button id="reloadButton" class="flex-shrink-0 bg-gray-200 text-gray-700 p-3 sm:p-4 rounded-lg hover:bg-gray-300 active:bg-gray-400 transition-colors" title="Soal Baru">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-refresh-cw h-5 w-5 sm:h-6 sm:w-6"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                     </button>
                 </div>
             </div>
@@ -105,44 +106,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function numberToHiragana(num) {
         if (num === 0) return 'ゼロ';
-        const ones = ['', 'いち', 'に', 'さん', 'よん', 'ご', 'ろく', 'なな', 'はち', 'きゅう'];
-        const tens = ['', 'じゅう', 'にじゅう', 'さんじゅう', 'よんじゅう', 'ごじゅう', 'ろくじゅう', 'ななじゅう', 'はちじゅう', 'きゅうじゅう'];
-        let result = '';
-        if (num >= 1000000) {
-            const millions = Math.floor(num / 1000000);
-            result += (millions === 1 ? '' : numberToHiragana(millions)) + 'ひゃくまん';
-            num %= 1000000;
+
+        // Helper untuk mengonversi angka di bawah 10,000
+        const convertChunk = (n, isManPrefix = false) => {
+            if (n === 0) return '';
+            const ones = ['', 'いち', 'に', 'さん', 'よん', 'ご', 'ろく', 'なな', 'はち', 'きゅう'];
+            const tens = ['', 'じゅう', 'にじゅう', 'さんじゅう', 'よんじゅう', 'ごじゅう', 'ろくじゅう', 'ななじゅう', 'はちじゅう', 'きゅうじゅう'];
+            let result = '';
+
+            const thousands = Math.floor(n / 1000);
+            if (thousands > 0) {
+                if (thousands === 1) result += (isManPrefix ? 'いっせん' : 'せん'); // Perbaikan untuk いっせんまん
+                else if (thousands === 3) result += 'さんぜん';
+                else if (thousands === 8) result += 'はっせん';
+                else result += ones[thousands] + 'せん';
+            }
+            n %= 1000;
+
+            const hundreds = Math.floor(n / 100);
+            if (hundreds > 0) {
+                if (hundreds === 1) result += 'ひゃく';
+                else if (hundreds === 3) result += 'さんびゃく';
+                else if (hundreds === 6) result += 'ろっぴゃく';
+                else if (hundreds === 8) result += 'はっぴゃく';
+                else result += ones[hundreds] + 'ひゃく';
+            }
+            n %= 100;
+            
+            if (n >= 10) {
+                result += tens[Math.floor(n / 10)];
+            }
+            n %= 10;
+
+            if (n > 0) {
+                result += ones[n];
+            }
+            return result;
+        };
+
+        if (num < 10000) {
+            return convertChunk(num);
         }
-        if (num >= 10000) {
-            const tenThousands = Math.floor(num / 10000);
-            result += (tenThousands === 1 ? 'いち' : numberToHiragana(tenThousands)) + 'まん';
-            num %= 10000;
-        }
-        if (num >= 1000) {
-            const thousands = Math.floor(num / 1000);
-            if (thousands === 1) result += 'せん';
-            else if (thousands === 3) result += 'さんぜん';
-            else if (thousands === 8) result += 'はっせん';
-            else result += ones[thousands] + 'せん';
-            num %= 1000;
-        }
-        if (num >= 100) {
-            const hundreds = Math.floor(num / 100);
-            if (hundreds === 1) result += 'ひゃく';
-            else if (hundreds === 3) result += 'さんびゃく';
-            else if (hundreds === 6) result += 'ろっぴゃく';
-            else if (hundreds === 8) result += 'はっぴゃく';
-            else result += ones[hundreds] + 'ひゃく';
-            num %= 100;
-        }
-        if (num >= 10) {
-            result += tens[Math.floor(num / 10)];
-            num %= 10;
-        }
-        if (num > 0) {
-            result += ones[num];
-        }
-        return result;
+        
+        const manPart = Math.floor(num / 10000);
+        const remainderPart = num % 10000;
+        
+        const manStr = convertChunk(manPart, true) + 'まん';
+        const remainderStr = convertChunk(remainderPart);
+
+        return manStr + remainderStr;
     }
 
     function saveState() {
@@ -250,11 +262,11 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(generateQuestionForCurrentMode, 1500);
         } else {
             wrongAttempts++;
-            if (wrongAttempts >= 2) {
+            if (wrongAttempts >= 3) {
                 showFeedback(`Jawaban benar: ${correctAnswer}`, false);
                 answerInput.disabled = true;
                 checkButton.disabled = true;
-                setTimeout(generateQuestionForCurrentMode, 3000);
+                // setTimeout untuk soal berikutnya telah dihapus dari sini.
             } else {
                 showFeedback('Salah, coba lagi!', false);
                 answerInput.focus();
