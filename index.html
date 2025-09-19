@@ -9,7 +9,7 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #e0f2fe; /* Light blue background */
+            background-color: #e0f2fe;
         }
         .japanese-font {
             font-family: 'Noto Sans JP', sans-serif;
@@ -17,7 +17,6 @@
         .feedback {
             transition: opacity 0.3s ease-in-out;
         }
-        /* Menyembunyikan panah atas/bawah pada input angka */
         input[type=number]::-webkit-inner-spin-button,
         input[type=number]::-webkit-outer-spin-button {
             -webkit-appearance: none;
@@ -25,6 +24,29 @@
         }
         input[type=number] {
             -moz-appearance: textfield;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            75% { transform: scale(1.05); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        .animate-fadeIn { animation: fadeIn 0.4s ease-out forwards; }
+        .animate-popIn { animation: popIn 0.3s ease-out forwards; }
+        .animate-shake { animation: shake 0.4s ease-in-out forwards; }
+        
+        #feedback {
+            overflow-wrap: break-word;
+            word-break: keep-all;
         }
     </style>
 </head>
@@ -68,7 +90,7 @@
                 </div>
                
                 <!-- Feedback -->
-                <div id="feedback" class="feedback h-6 mt-4 text-center font-semibold text-sm sm:text-base opacity-0"></div>
+                <div id="feedback" class="feedback min-h-[1.5rem] mt-4 text-center font-semibold text-sm sm:text-base opacity-0"></div>
 
                 <!-- Tombol Aksi -->
                 <div class="flex items-center gap-3 mt-4">
@@ -76,11 +98,26 @@
                         Cek Jawaban
                     </button>
                     <button id="reloadButton" class="flex-shrink-0 bg-gray-200 text-gray-700 p-3 sm:p-4 rounded-lg hover:bg-gray-300 active:bg-gray-400 transition-colors" title="Soal Baru">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-refresh-cw h-5 w-5 sm:h-6 sm:w-6"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-refresh-cw h-5 w-5 sm:h-6 sm:w-6"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                     </button>
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Modal untuk Penjelasan Kesalahan -->
+    <div id="errorModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center p-4 z-50 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 transform transition-all duration-300 scale-95 opacity-0" id="modalContent">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-slate-800">Analisis Jawaban</h3>
+                <button id="closeModalBtn" class="text-gray-500 hover:text-gray-800 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div id="errorAnalysis" class="space-y-3 text-base">
+                <!-- Konten analisis akan dimasukkan oleh JavaScript -->
+            </div>
+        </div>
     </div>
 
 <script>
@@ -94,35 +131,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const checkButton = document.getElementById('checkButton');
     const reloadButton = document.getElementById('reloadButton');
     const feedback = document.getElementById('feedback');
+    const errorModal = document.getElementById('errorModal');
+    const modalContent = document.getElementById('modalContent');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const errorAnalysis = document.getElementById('errorAnalysis');
     
     // State Aplikasi
     let currentMode = 'numToHira';
-    let questions = {
-        numToHira: { number: 0, hiragana: '' },
-        hiraToNum: { number: 0, hiragana: '' }
-    };
+    let questions = { numToHira: { number: 0, hiragana: '' }, hiraToNum: { number: 0, hiragana: '' } };
     let correctAnswer = '';
     let wrongAttempts = 0;
 
     function numberToHiragana(num) {
         if (num === 0) return 'ゼロ';
-
-        // Helper untuk mengonversi angka di bawah 10,000
         const convertChunk = (n, isManPrefix = false) => {
             if (n === 0) return '';
             const ones = ['', 'いち', 'に', 'さん', 'よん', 'ご', 'ろく', 'なな', 'はち', 'きゅう'];
             const tens = ['', 'じゅう', 'にじゅう', 'さんじゅう', 'よんじゅう', 'ごじゅう', 'ろくじゅう', 'ななじゅう', 'はちじゅう', 'きゅうじゅう'];
             let result = '';
-
             const thousands = Math.floor(n / 1000);
             if (thousands > 0) {
-                if (thousands === 1) result += (isManPrefix ? 'いっせん' : 'せん'); // Perbaikan untuk いっせんまん
+                if (thousands === 1) result += (isManPrefix ? 'いっせん' : 'せん');
                 else if (thousands === 3) result += 'さんぜん';
                 else if (thousands === 8) result += 'はっせん';
                 else result += ones[thousands] + 'せん';
             }
             n %= 1000;
-
             const hundreds = Math.floor(n / 100);
             if (hundreds > 0) {
                 if (hundreds === 1) result += 'ひゃく';
@@ -132,38 +166,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 else result += ones[hundreds] + 'ひゃく';
             }
             n %= 100;
-            
-            if (n >= 10) {
-                result += tens[Math.floor(n / 10)];
-            }
+            if (n >= 10) result += tens[Math.floor(n / 10)];
             n %= 10;
-
-            if (n > 0) {
-                result += ones[n];
-            }
+            if (n > 0) result += ones[n];
             return result;
         };
-
-        if (num < 10000) {
-            return convertChunk(num);
-        }
-        
+        if (num < 10000) return convertChunk(num);
         const manPart = Math.floor(num / 10000);
         const remainderPart = num % 10000;
-        
         const manStr = convertChunk(manPart, true) + 'まん';
         const remainderStr = convertChunk(remainderPart);
-
         return manStr + remainderStr;
     }
 
     function saveState() {
-        const state = {
+        localStorage.setItem('nihongoMasterState', JSON.stringify({
             currentMode: currentMode,
             questions: questions,
             difficulty: difficultySelector.value
-        };
-        localStorage.setItem('nihongoMasterState', JSON.stringify(state));
+        }));
     }
 
     function loadState() {
@@ -182,10 +203,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function updateQuestionDisplay() {
         const questionData = questions[currentMode];
+        const questionDisplay = document.getElementById('questionDisplay'); 
         if (!questionData || questionData.number === 0) {
              generateQuestionForCurrentMode();
              return;
         }
+        questionDisplay.classList.remove('animate-fadeIn');
+        void questionDisplay.offsetWidth; 
+        questionDisplay.classList.add('animate-fadeIn');
         if (currentMode === 'numToHira') {
             questionText.textContent = questionData.number.toLocaleString('en-US');
             questionText.classList.remove('japanese-font');
@@ -203,13 +228,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function generateQuestionForCurrentMode() {
         answerInput.value = '';
         hideFeedback();
-        
         const maxNumber = parseInt(difficultySelector.value);
         const newNumber = Math.floor(Math.random() * maxNumber) + 1;
-        
-        questions[currentMode].number = newNumber;
-        questions[currentMode].hiragana = numberToHiragana(newNumber);
-        
+        questions[currentMode] = { number: newNumber, hiragana: numberToHiragana(newNumber) };
         updateQuestionDisplay();
         saveState();
     }
@@ -218,13 +239,11 @@ document.addEventListener('DOMContentLoaded', () => {
         currentMode = newMode;
         answerInput.value = ''; 
         hideFeedback();
-
         if (newMode === 'numToHira') {
             modeNumToHiraBtn.classList.add('bg-blue-500', 'text-white');
             modeNumToHiraBtn.classList.remove('bg-gray-100', 'text-gray-700');
             modeHiraToNumBtn.classList.remove('bg-blue-500', 'text-white');
             modeHiraToNumBtn.classList.add('bg-gray-100', 'text-gray-700');
-            
             answerInput.type = 'text';
             answerInput.placeholder = 'Ketik jawaban Hiragana...';
         } else {
@@ -232,7 +251,6 @@ document.addEventListener('DOMContentLoaded', () => {
             modeHiraToNumBtn.classList.remove('bg-gray-100', 'text-gray-700');
             modeNumToHiraBtn.classList.remove('bg-blue-500', 'text-white');
             modeNumToHiraBtn.classList.add('bg-gray-100', 'text-gray-700');
-
             answerInput.type = 'number';
             answerInput.placeholder = 'Masukkan angka...';
         }
@@ -241,18 +259,122 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function showFeedback(message, isCorrect) {
+        feedback.classList.remove('animate-popIn', 'animate-shake');
+        void feedback.offsetWidth;
         feedback.textContent = message;
         feedback.style.color = isCorrect ? '#16a34a' : '#dc2626';
         feedback.classList.remove('opacity-0');
+        feedback.classList.add(isCorrect ? 'animate-popIn' : 'animate-shake');
     }
     
     function hideFeedback() {
         feedback.classList.add('opacity-0');
     }
 
+    function analyzeError(userAnswer, correctAnswer, questionNumber) {
+        let diffIndex = -1;
+        for (let i = 0; i < correctAnswer.length; i++) {
+            if (i >= userAnswer.length || userAnswer[i] !== correctAnswer[i]) {
+                diffIndex = i;
+                break;
+            }
+        }
+        if (diffIndex === -1 && userAnswer.length !== correctAnswer.length) {
+            diffIndex = Math.min(userAnswer.length, correctAnswer.length);
+        }
+
+        let userHtml;
+        if (diffIndex !== -1) {
+            const correctPart = userAnswer.substring(0, diffIndex);
+            const incorrectPart = userAnswer.substring(diffIndex);
+            userHtml = `<span class="text-green-600">${correctPart}</span><span class="bg-red-200 text-red-800 font-bold px-1 rounded">${incorrectPart}</span>`;
+        } else {
+            userHtml = `<span class="text-green-600">${userAnswer}</span>`;
+        }
+
+        let explanation = '';
+        const userChar = userAnswer[diffIndex];
+        const correctChar = correctAnswer[diffIndex];
+        const prevCorrectChars = correctAnswer.substring(diffIndex - 3, diffIndex);
+
+        const commonMistakes = {
+            'ひ': { 'び': 'Dakuten (゛)', 'ぴ': 'Handakuten (゜)' }, 'は': { 'ば': 'Dakuten (゛)', 'ぱ': 'Handakuten (゜)' },
+            'ふ': { 'ぶ': 'Dakuten (゛)', 'ぷ': 'Handakuten (゜)' }, 'へ': { 'べ': 'Dakuten (゛)', 'ぺ': 'Handakuten (゜)' },
+            'ほ': { 'ぼ': 'Dakuten (゛)', 'ぽ': 'Handakuten (゜)' }, 'さ': { 'ざ': 'Dakuten (゛)' }, 'し': { 'じ': 'Dakuten (゛)' },
+            'す': { 'ず': 'Dakuten (゛)' }, 'せ': { 'ぜ': 'Dakuten (゛)' }, 'そ': { 'ぞ': 'Dakuten (゛)' },
+            'た': { 'だ': 'Dakuten (゛)' }, 'ち': { 'ぢ': 'Dakuten (゛)' }, 'つ': { 'づ': 'Dakuten (゛)' }, 'て': { 'で': 'Dakuten (゛)' },
+            'と': { 'ど': 'Dakuten (゛)' }, 'き': { 'ぎ': 'Dakuten (゛)' }, 'く': { 'ぐ': 'Dakuten (゛)' },
+            'け': { 'げ': 'Dakuten (゛)' }, 'こ': { 'ご': 'Dakuten (゛)' },
+        };
+
+        if (!userChar) {
+            explanation = `Jawaban Anda belum lengkap. Setelah <span class="font-bold text-slate-700">${userAnswer}</span>, seharusnya dilanjutkan dengan <span class="font-bold text-slate-700">${correctAnswer.substring(diffIndex)}</span>.`;
+        } else if (correctChar === 'っ' && userChar !== 'っ') {
+            explanation = `Perhatikan aturan <span class="font-bold text-red-600">Sokuon (っ)</span> atau perubahan suara. Setelah <span class="font-bold">${prevCorrectChars}</span>, seharusnya ada konsonan ganda yang ditandai dengan 'tsu' kecil.`;
+        } else if (commonMistakes[userChar] && commonMistakes[userChar][correctChar]) {
+            const mistakeType = commonMistakes[userChar][correctChar];
+            explanation = `Terjadi kesalahan pada perubahan suara <span class="font-bold text-red-600">${mistakeType}</span>. Seharusnya ditulis <span class="font-bold text-green-700">'${correctChar}'</span>, bukan <span class="font-bold text-red-700">'${userChar}'</span>.`;
+        } else if (userAnswer.length > correctAnswer.length && diffIndex >= correctAnswer.length) {
+            explanation = `Jawaban Anda terlalu panjang. Bagian <span class="font-bold bg-red-200 px-1 rounded">${userAnswer.substring(correctAnswer.length)}</span> seharusnya tidak ada.`;
+        } else {
+            explanation = `Terjadi kesalahan pada karakter ini. Seharusnya <span class="font-bold text-green-700">'${correctChar}'</span>, bukan <span class="font-bold text-red-700">'${userChar}'</span>.`;
+        }
+
+        return `
+            <div class="border-b pb-3 mb-3">
+                <p class="text-sm text-gray-600">Soal Angka:</p>
+                <p class="text-2xl font-bold text-slate-800">${questionNumber.toLocaleString('en-US')}</p>
+            </div>
+            <p class="font-semibold">Jawaban Anda:</p>
+            <div class="p-3 rounded-lg bg-gray-100 text-gray-800 japanese-font text-lg">${userHtml}</div>
+            <p class="mt-3 font-semibold">Jawaban Benar:</p>
+            <div class="p-3 rounded-lg bg-green-100 border border-green-200 text-green-800 japanese-font text-lg">${correctAnswer}</div>
+            <div class="mt-4 p-3 rounded-lg bg-yellow-100 border border-yellow-200 text-yellow-900">
+                <h4 class="font-bold mb-1">Penjelasan Kesalahan:</h4>
+                <p>${explanation}</p>
+            </div>
+        `;
+    }
+
+    // === FUNGSI BARU UNTUK ANALISIS KESALAHAN ANGKA ===
+    function analyzeNumberError(userAnswer, correctAnswer, questionHiragana) {
+        const formattedUserAnswer = parseInt(userAnswer).toLocaleString('en-US');
+        const formattedCorrectAnswer = parseInt(correctAnswer).toLocaleString('en-US');
+
+        return `
+            <div class="border-b pb-3 mb-3">
+                <p class="text-sm text-gray-600">Soal Hiragana:</p>
+                <p class="text-2xl font-bold text-slate-800 japanese-font">${questionHiragana}</p>
+            </div>
+            <p class="font-semibold">Jawaban Angka Anda:</p>
+            <div class="p-3 rounded-lg bg-red-100 border border-red-200 text-red-800 text-lg font-mono">${formattedUserAnswer}</div>
+            <p class="mt-3 font-semibold">Jawaban Angka Benar:</p>
+            <div class="p-3 rounded-lg bg-green-100 border border-green-200 text-green-800 text-lg font-mono">${formattedCorrectAnswer}</div>
+            <div class="mt-4 p-3 rounded-lg bg-yellow-100 border border-yellow-200 text-yellow-900">
+                <h4 class="font-bold mb-1">Penjelasan:</h4>
+                <p>Jawaban angka yang Anda masukkan tidak sesuai dengan tulisan Hiragana yang diberikan.</p>
+            </div>
+        `;
+    }
+
+    function showModal() {
+        errorModal.classList.remove('hidden');
+        setTimeout(() => {
+            errorModal.classList.remove('opacity-0');
+            modalContent.classList.remove('scale-95', 'opacity-0');
+        }, 10);
+    }
+
+    function hideModal() {
+        errorModal.classList.add('opacity-0');
+        modalContent.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            errorModal.classList.add('hidden');
+        }, 300);
+    }
+
     function checkAnswer() {
         const userAnswer = answerInput.value.trim().toLowerCase();
-        
         if (!userAnswer) return;
 
         if (userAnswer === correctAnswer) {
@@ -262,11 +384,20 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(generateQuestionForCurrentMode, 1500);
         } else {
             wrongAttempts++;
+
             if (wrongAttempts >= 3) {
                 showFeedback(`Jawaban benar: ${correctAnswer}`, false);
                 answerInput.disabled = true;
                 checkButton.disabled = true;
-                // setTimeout untuk soal berikutnya telah dihapus dari sini.
+
+                // === PERUBAHAN: Memeriksa mode sebelum menampilkan modal ===
+                if (currentMode === 'numToHira') {
+                    errorAnalysis.innerHTML = analyzeError(userAnswer, correctAnswer, questions[currentMode].number);
+                    showModal();
+                } else if (currentMode === 'hiraToNum') {
+                    errorAnalysis.innerHTML = analyzeNumberError(userAnswer, correctAnswer, questions[currentMode].hiragana);
+                    showModal();
+                }
             } else {
                 showFeedback('Salah, coba lagi!', false);
                 answerInput.focus();
@@ -278,11 +409,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const maxNumber = parseInt(difficultySelector.value);
         let num1 = Math.floor(Math.random() * maxNumber) + 1;
         questions.numToHira = { number: num1, hiragana: numberToHiragana(num1) };
-
         let num2;
-        do {
-            num2 = Math.floor(Math.random() * maxNumber) + 1;
-        } while (num1 === num2);
+        do { num2 = Math.floor(Math.random() * maxNumber) + 1; } while (num1 === num2);
         questions.hiraToNum = { number: num2, hiragana: numberToHiragana(num2) };
         saveState();
     }
@@ -290,19 +418,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Event Listeners
     modeNumToHiraBtn.addEventListener('click', () => switchMode('numToHira'));
     modeHiraToNumBtn.addEventListener('click', () => switchMode('hiraToNum'));
-    
     difficultySelector.addEventListener('change', () => {
         initializeBothQuestions();
         updateQuestionDisplay();
     });
-
     reloadButton.addEventListener('click', generateQuestionForCurrentMode);
     checkButton.addEventListener('click', checkAnswer);
     answerInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            checkAnswer();
+            checkButton.click();
         }
+    });
+    closeModalBtn.addEventListener('click', hideModal);
+    errorModal.addEventListener('click', (e) => {
+        if (e.target === errorModal) hideModal();
     });
 
     // Inisialisasi Aplikasi
