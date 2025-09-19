@@ -1,0 +1,21 @@
+services:
+  # Layanan ini menangani semua tugas Node.js (instalasi, build, watch)
+  builder:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    # Perintah baru: Instal, build sekali, lalu mulai mode 'watch'
+    command: sh -c "npm install && npm run build && npm run build:dev"
+
+  # Layanan ini menjalankan web server Nginx
+  web:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./dist:/usr/share/nginx/html
+    # Memastikan layanan 'web' baru berjalan setelah 'builder' dimulai
+    depends_on:
+      - builder
+
